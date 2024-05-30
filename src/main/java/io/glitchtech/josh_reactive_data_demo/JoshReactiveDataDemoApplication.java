@@ -10,7 +10,6 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.data.repository.reactive.ReactiveCrudRepository;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
@@ -35,47 +34,32 @@ class SampleDataInitializer {
     @EventListener(ApplicationReadyEvent.class)
     public void ready() {
         // Create a list of names
-        Flux<String> names = Flux.just(
-                "Muzi", "Rea", "Liyanda", "Bomme", "Themba", "Ntando", "Bongi", "Kaykay"
-        );
-        // Create a Flux of reservations from the list of names
-        Flux<Reservation> reservations = names.map(name -> new Reservation(null, name));
-        // reservationRepository.save(Reservation) returns Mono<Reservation>
-        // But we need a list which is Flux<Reservation>, Mono<Reservation> is only one
-        // So to flatten Flux<<Mono<Reservation>> to Flux<Reservation> we use flatMap
-        Flux<Reservation> saved = reservations.flatMap(this.reservationRepository::save);
-
+        Flux<Reservation> reservations = Flux
+                .just("Muzi", "Rea", "Liyanda", "Bomme", "Themba", "Ntando", "Bongi", "Kaykay")
+                .map(name -> new Reservation(null, name))
+                .flatMap(reservationRepository::save);
         // Clean the database before saving data
         this.reservationRepository
                 // delete all data in the DB
                 .deleteAll()
                 // Create a Publisher  from saved Flux<Reservation>
-                .thenMany(saved)
+                .thenMany(reservations)
                 // Read the records from above step
                 .thenMany(this.reservationRepository.findAll())
                 // log each
                 .subscribe(log::info);
-
-       /* // Cleaner method
-        Flux<Reservation> reservationFlux = Flux.just(
-                        "Muzi", "Rea", "Liyanda", "Bomme", "Themba", "Ntando", "Bongi", "Kaykay"
-                ).map(name -> new Reservation(null, name))
-                .flatMap(reservationRepository::save);
-        // Start the stream
-        reservationFlux.subscribe(log::info:while ();*/
     }
 }
 
 // Persist to Mongo Database
-interface ReservationRepository extends ReactiveCrudRepository<Reservation, String> {
+interface ReservationRepository extends ReactiveCrudRepository<Reservation, Integer> {
 }
 
-@Document
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
 class Reservation {
     @Id
-    private String id;
+    private Integer id;
     private String name;
 }
